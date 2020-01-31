@@ -1,0 +1,296 @@
+<Project ToolsVersion="15.0">
+  <!-- MSBuild generated props -->
+  <Import Project="$(MSBuildArtifactsDirectory)*.targets" />
+
+  <!-- Version -->
+  <PropertyGroup>
+    <Version Condition=" '$(Version)' == '' ">$(GitVersion)</Version>
+  </PropertyGroup>
+
+  <!-- Defaults -->
+  <PropertyGroup>
+    <SkipSourceLink>true</SkipSourceLink>
+  </PropertyGroup>
+
+  <!-- Compiler flags -->
+  <Choose>
+    <When Condition="$(TargetFramework.Contains('net4'))">
+      <PropertyGroup>
+        <DefineConstants>$(DefineConstants);IS_DESKTOP</DefineConstants>
+        <IsDesktop>true</IsDesktop>
+      </PropertyGroup>
+    </When>
+    <When Condition="$(TargetFramework.Contains('netstandard')) OR $(TargetFramework.Contains('netcoreapp'))">
+      <PropertyGroup>
+        <DefineConstants>$(DefineConstants);IS_CORECLR</DefineConstants>
+        <IsCore>true</IsCore>
+      </PropertyGroup>
+    </When>
+    <Otherwise>
+      <PropertyGroup>
+        <IsFrameworkInvalid Condition=" '$(TargetFramework)' != '' ">true</IsFrameworkInvalid>
+      </PropertyGroup>
+    </Otherwise>
+  </Choose>
+
+  <!-- Default package versions -->
+  <PropertyGroup>
+    <FluentAssertionsVersion Condition=" '$(FluentAssertionsVersion)' == '' ">4.19.4</FluentAssertionsVersion>
+    <ToStringWithoutOverrideAnalyzerVersion Condition=" '$(ToStringWithoutOverrideAnalyzerVersion)' == '' ">0.5.0</ToStringWithoutOverrideAnalyzerVersion>
+    <TestSDKVersion Condition=" '$(TestSDKVersion)' == '' ">15.8.0</TestSDKVersion>
+    <XunitVersion Condition=" '$(XunitVersion)' == '' ">2.4.1</XunitVersion>
+    <XunitRunnerVisualStudioVersion Condition=" '$(XunitRunnerVisualStudioVersion)' == '' ">$(XunitVersion)</XunitRunnerVisualStudioVersion>
+    <SourceLinkVersion Condition=" '$(SourceLinkVersion)' == '' ">2.8.0</SourceLinkVersion>
+  </PropertyGroup>
+
+  <!-- Verify that the framework was identified above -->
+  <Target Name="VerifyTargetFrameworkPlatform" BeforeTargets="Build;Rebuild" Condition=" '$(IsFrameworkInvalid)' == 'true' ">
+    <Error Message="Unknown target framework: $(TargetFramework), update build scripts." />
+  </Target>
+
+  <!-- Symbols -->
+  <ItemGroup Condition=" '$(PackProject)' == 'true' AND '$(SkipSourceLink)' != 'true' ">
+    <PackageReference Include="SourceLink.Create.GitHub" Version="$(SourceLinkVersion)" PrivateAssets="all" />
+    <DotNetCliToolReference Include="dotnet-sourcelink-git" Version="$(SourceLinkVersion)" />
+    <DotNetCliToolReference Include="dotnet-sourcelink" Version="$(SourceLinkVersion)" />
+  </ItemGroup>
+
+  <!-- Nupkg -->
+  <PropertyGroup Condition=" '$(PackProject)' == 'true' AND '$(SkipDocs)' != 'true' ">
+    <GenerateDocumentationFile Condition=" '$(GenerateDocumentationFile)' == '' " >true</GenerateDocumentationFile>
+    <NoWarn>1591;1573</NoWarn>
+  </PropertyGroup>
+
+  <!-- Create nupkg hook -->
+  <PropertyGroup Condition=" '$(PackProject)' == 'true' ">
+    <IsPackable>true</IsPackable>
+    <IncludeSymbols Condition=" '$(IncludeSymbols)' == '' ">true</IncludeSymbols>
+    <PackageOutputPath>$(NupkgOutputDirectory)</PackageOutputPath>
+    <NoPackageAnalysis>true</NoPackageAnalysis>
+  </PropertyGroup>
+
+  <!-- Test projects -->
+  <PropertyGroup Condition=" '$(TestProject)' == 'true' ">
+    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
+    <GenerateBindingRedirectsOutputType>true</GenerateBindingRedirectsOutputType>
+  </PropertyGroup>
+
+  <ItemGroup Condition=" '$(TestProject)' == 'true' ">
+    <!-- Disable parallel on appveyor due to an issue with xunit 2.2.0 -->
+    <None Include="$(BuildCommonDirectory)TestShared\xunit.runner.json" Condition=" '$(APPVEYOR)' != 'true' ">
+      <Link>xunit.runner.json</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <Compile Include="$(BuildCommonDirectory)TestShared\*.cs" />
+  </ItemGroup>
+
+  <ItemGroup Condition=" '$(TestProject)' == 'true' ">
+    <PackageReference Include="FluentAssertions" Version="$(FluentAssertionsVersion)" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="$(TestSDKVersion)" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="$(XunitRunnerVisualStudioVersion)" />
+    <PackageReference Include="xunit" Version="$(XunitVersion)" />
+  </ItemGroup>
+
+  <ItemGroup Condition=" '$(TestProject)' != 'true' ">
+    <PackageReference Include="ToStringWithoutOverrideAnalyzer" Version="$(ToStringWithoutOverrideAnalyzerVersion)" PrivateAssets="all" />
+  </ItemGroup>
+
+  <!-- Sign -->
+  <PropertyGroup Condition=" '$(SignKeyPath)' != '' AND '$(TestProject)' != 'true' AND '$(IsXPlat)' != 'true' AND Exists($(SignKeyPath)) ">
+    <SignAssembly>true</SignAssembly>
+    <DelaySign>false</DelaySign>
+    <AssemblyOriginatorKeyFile>$(SignKeyPath)</AssemblyOriginatorKeyFile>
+  </PropertyGroup>
+
+  <!--
+    ============================================================
+    PackProjects
+    ============================================================
+  -->
+  <Target Name="PackProjects" Condition=" '$(PackProject)' == 'true' ">
+    <Message Text="Packing $(ProjectName)" Importance="high" />
+
+    <!-- Run pack on the project -->
+    <MSBuild
+      Projects="$(MSBuildProjectFullPath)"
+      Targets="Pack"
+      Properties="Configuration=$(Configuration);
+                  PackageOutputPath=$(NupkgOutputDirectory);
+                  NoPackageAnalysis=true;
+                  IncludeSymbols=true;
+                  IsPackable=true;">
+    </MSBuild>
+  </Target>
+
+  <!--
+    ============================================================
+    PublishProjects
+    ============================================================
+  -->
+  <Target Name="PublishProjects" Condition=" '$(PublishProject)' == 'true' ">
+    <Message Text="Publishing $(ProjectName)" Importance="high" />
+
+    <!-- Run publish on the project -->
+    <MSBuild
+      Projects="$(MSBuildProjectFullPath)"
+      Targets="PublishPortableApp"
+      Properties="Configuration=release;">
+    </MSBuild>
+  </Target>
+
+  <!--
+    ============================================================
+    GetTestAssemblies
+    ============================================================
+  -->
+  <Target Name="GetTestAssemblies"
+          DependsOnTargets="Build;GetTargetFrameworkSet"
+          Condition=" '$(TestProject)' == 'true' AND '$(SkipTests)' != 'true' "
+          Returns="@(TestAssemblyPath)">
+    <Message Text="Discovering test assemblies for $(AssemblyName)" Importance="high" />
+
+    <!-- Execute find for all frameworks -->
+    <MSBuild
+      Projects="$(MSBuildProjectFullPath)"
+      Targets="GetTestAssembliesInner"
+      Properties="TargetFramework=%(ProjectTargetFrameworkEntries.Identity);
+                  Configuration=$(Configuration);">
+      <Output TaskParameter="TargetOutputs"
+              ItemName="TestAssemblyPath" />
+    </MSBuild>
+  </Target>
+
+  <!--
+    ============================================================
+    GetTestAssembliesInner
+    ============================================================
+  -->
+  <Target Name="GetTestAssembliesInner"
+          Returns="@(TestAssemblyPath)">
+
+    <PropertyGroup>
+      <TestAssemblyRelativePath>$(OutputPath)$(AssemblyName).dll</TestAssemblyRelativePath>
+      <!-- If the tests are built as an .exe use that file. -->
+      <TestAssemblyRelativePath Condition="Exists('$(OutputPath)$(AssemblyName).exe')">$(OutputPath)$(AssemblyName).exe</TestAssemblyRelativePath>
+    </PropertyGroup>
+
+    <ConvertToAbsolutePath Paths="$(TestAssemblyRelativePath)">
+      <Output TaskParameter="AbsolutePaths" PropertyName="AbsoluteTestAssemblyPath"/>
+    </ConvertToAbsolutePath>
+
+    <ItemGroup>
+      <TestAssemblyPath Include="$(AbsoluteTestAssemblyPath)">
+        <IsDesktop Condition=" '$(IsDesktop)' == 'true' ">true</IsDesktop>
+        <IsCore Condition=" '$(IsDesktop)' != 'true' ">true</IsCore>
+      </TestAssemblyPath>
+    </ItemGroup>
+  </Target>
+
+  <!--
+    ============================================================
+    GetTargetFrameworkSet get all target frameworks
+    ============================================================
+  -->
+  <Target Name="GetTargetFrameworkSet" Returns="@(ProjectTargetFrameworkEntries)">
+    <!-- Find all frameworks to run on -->
+    <ItemGroup>
+      <ProjectTargetFrameworkEntries Include="$(TargetFramework);$(TargetFrameworks)" />
+    </ItemGroup>
+  </Target>
+
+  <!--
+    ============================================================
+    Publish as a portable app
+    ============================================================
+  -->
+  <Target Name="PublishPortableApp" DependsOnTargets="GetTargetFrameworkSet">
+
+    <MakeDir Directories="$(PublishOutputDirectory)" />
+
+    <!-- Run publish -->
+    <MSBuild Projects="$(MSBuildProjectFullPath)"
+             Targets="PublishPortableAppInner;WriteToolSettingsInner"
+             Properties="TargetFramework=%(ProjectTargetFrameworkEntries.Identity);
+                         PublishOutputDirectory=$(PublishOutputDirectory);
+                         PublishProjectFilePath=$(MSBuildProjectFullPath);
+                         DotnetExePath=$(DotnetExePath);" />
+  </Target>
+
+  <!--
+    ============================================================
+    Publish the project as a portable app
+    ============================================================
+  -->
+  <Target Name="PublishPortableAppInner">
+
+    <PropertyGroup>
+      <PublishSpecificFrameworkOutput Condition=" '$(PublishSpecificFrameworkOutput)' == '' ">$(PublishOutputDirectory)$(TargetFramework)\</PublishSpecificFrameworkOutput>
+    </PropertyGroup>
+
+    <!-- Publish -->
+    <Exec Command="$(DotnetExePath) publish $(PublishProjectFilePath) -f $(TargetFramework) -o $(PublishSpecificFrameworkOutput) -c release" />
+  </Target>
+
+  <!--
+    ============================================================
+     Write DotnetToolSettings.xml for framework
+    ============================================================
+  -->
+  <Target Name="WriteToolSettingsInner">
+
+    <PropertyGroup>
+      <ToolEntryPoint Condition=" '$(ToolEntryPoint)' == '' AND $(PublishFramework.StartsWith('net4')) == 'true' ">$(AssemblyName).exe</ToolEntryPoint>
+      <ToolEntryPoint Condition=" '$(ToolEntryPoint)' == '' ">$(AssemblyName).dll</ToolEntryPoint>
+      <ToolOutputPath>$(PublishOutputDirectory)$(TargetFramework)\DotnetToolSettings.xml</ToolOutputPath>
+    </PropertyGroup>
+    
+    <!-- Run publish -->
+    <MSBuild Projects="$(MSBuildProjectFullPath)"
+             Targets="WriteToolSettingsFile"
+             Properties="ToolCommandName=$(ToolCommandName);
+                         ToolEntryPoint=$(ToolEntryPoint);
+                         ToolOutputPath=$(ToolOutputPath);" />
+  </Target>
+
+  <!--
+    ============================================================
+    Write DotnetToolSettings.xml
+
+    ToolCommandName, ToolEntryPoint, ToolOutputPath
+    ============================================================
+  -->
+  <Target Name="WriteToolSettingsFile">
+    <Error Text="ToolCommandName missing" Condition=" '$(ToolCommandName)' == '' " />
+    <Error Text="ToolEntryPoint missing" Condition=" '$(ToolEntryPoint)' == '' " />
+    <Error Text="ToolOutputPath missing" Condition=" '$(ToolOutputPath)' == '' " />
+
+    <ItemGroup>
+      <Line Include="line01">
+        <Text>&lt;?xml version=&quot;1.0&quot; encoding=&quot;utf-8&quot;?&gt;</Text>
+      </Line>
+      <Line Include="line02">
+        <Text>&lt;DotNetCliTool Version=&quot;1&quot;&gt;</Text>
+      </Line>
+      <Line Include="line03">
+        <Text>  &lt;Commands&gt;</Text>
+      </Line>
+      <Line Include="line04">
+        <Text>    &lt;Command Name=&quot;$(ToolCommandName)&quot; EntryPoint=&quot;$(ToolEntryPoint)&quot; Runner=&quot;dotnet&quot; /&gt;</Text>
+      </Line>
+      <Line Include="line05">
+        <Text>  &lt;/Commands&gt;</Text>
+      </Line>
+      <Line Include="line06">
+        <Text>&lt;/DotNetCliTool&gt;</Text>
+      </Line>
+      <LineText Include="%(Line.Text)" />
+    </ItemGroup>
+
+    <!-- -Write file -->
+    <WriteLinesToFile
+       File="$(ToolOutputPath)"
+       Lines="@(LineText)"
+       Overwrite="true"
+     />
+  </Target>
+</Project>

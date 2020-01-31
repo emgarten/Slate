@@ -1,0 +1,23 @@
+<Project ToolsVersion="15.0">
+  <!-- Dependency versions -->
+  <PropertyGroup>
+  </PropertyGroup>
+
+  <!-- Config -->
+  <PropertyGroup>
+    <RepositoryName>Slate</RepositoryName>
+  </PropertyGroup>
+
+  <!-- Nuspec defaults -->
+  <PropertyGroup>
+    <Authors>emgarten</Authors>
+    <ProjectUrl>https://github.com/emgarten/Slate</ProjectUrl>
+    <PackageLicenseUrl>https://github.com/emgarten/Slate/blob/master/LICENSE</PackageLicenseUrl>
+    <RepositoryType>git</RepositoryType>
+    <RepositoryUrl>https://github.com/emgarten/Slate</RepositoryUrl>
+    <PackageTags>slate</PackageTags>
+    <Description>dotnet helpers</Description>
+    <Copyright>Copyright © 2020 Justin Emgarten</Copyright>
+    <PackageIconUrl>https://emgartenstatic.blob.core.windows.net/nupkgs/icons/slate.png</PackageIconUrl>
+  </PropertyGroup>
+</Project>
