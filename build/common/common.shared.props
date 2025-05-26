@@ -9,6 +9,7 @@
   <PropertyGroup>
     <RepositoryRootDirectory>$([MSBuild]::GetDirectoryNameOfFileAbove($(MSBuildThisFileDirectory), 'README.md'))\</RepositoryRootDirectory>
     <RepositoryBuildDirectory>$(RepositoryRootDirectory)build\</RepositoryBuildDirectory>
+    <RepositoryBuildIconsDirectory>$(RepositoryBuildDirectory)icons\</RepositoryBuildIconsDirectory>
     <BuildCommonDirectory>$(RepositoryRootDirectory)build\common\</BuildCommonDirectory>
     <SolutionFile>$(RepositoryRootDirectory)$(RepositoryName).sln</SolutionFile>
     <ArtifactsDirectory>$(RepositoryRootDirectory)artifacts\</ArtifactsDirectory>
@@ -29,7 +30,7 @@
   <PropertyGroup>
     <TreatWarningsAsErrors>True</TreatWarningsAsErrors>
     <WarningsAsErrors>True</WarningsAsErrors>
-    <DebugType>portable</DebugType>
+    <DebugType>embedded</DebugType>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
     <ComVisible>false</ComVisible>
@@ -53,6 +54,9 @@
 
   <Import Project="$(CIRootDirectory)common\*.props" />
   <Import Project="$(CIRootDirectory)$(RepositoryName)\*.props" />
+
+  <!-- Default nuspec props -->
+  <Import Project="$(BuildCommonDirectory)nuspec.props" />
 
   <!-- MSBuild generated props -->
   <Import Project="$(MSBuildArtifactsDirectory)*.props" />

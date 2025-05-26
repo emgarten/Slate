@@ -20,9 +20,11 @@ Function Install-DotnetCLI {
 
         Write-Host "Fetching $installDotnet"
 
-        wget https://raw.githubusercontent.com/dotnet/cli/1f4478755d57ed37058096ed739bbdf9b3d2eb3c/scripts/obtain/dotnet-install.ps1 -OutFile $installDotnet
+        Invoke-WebRequest https://dot.net/v1/dotnet-install.ps1 -OutFile $installDotnet
 
-        & $installDotnet -Channel 3.0 -i $CLIRoot -Version 3.0.100
+        & $installDotnet -Channel 6.0 -i $CLIRoot
+        & $installDotnet -Channel 8.0 -i $CLIRoot
+        & $installDotnet -Channel 9.0 -i $CLIRoot
 
         if (-not (Test-Path $DotnetExe)) {
             Write-Log "Missing $DotnetExe"
@@ -71,7 +73,7 @@ Function Install-NuGetExe {
         $nugetDir = Split-Path $nugetExe
         New-Item -ItemType Directory -Force -Path $nugetDir
 
-        wget https://dist.nuget.org/win-x86-commandline/v5.3.0/nuget.exe -OutFile $nugetExe
+        Invoke-WebRequest https://dist.nuget.org/win-x86-commandline/v6.12.1/nuget.exe -OutFile $nugetExe
     }
 }
 
@@ -119,24 +121,10 @@ Function Invoke-DotnetMSBuild {
     $buildArgs += "/nologo"
     $buildArgs += "/v:m"
     $buildArgs += "/nr:false"
+    $buildArgs += "/m:1"
     $buildArgs += $Arguments
 
     Invoke-DotnetExe $RepoRoot $buildArgs
-}
-
-Function Install-DotnetTools {
-    param(
-        [string]$RepoRoot
-    )
-
-    $toolsPath = Join-Path $RepoRoot ".nuget/tools"
-
-    if (-not (Test-Path $toolsPath)) {
-        Write-Host "Installing dotnet tools to $toolsPath"
-        $args = @("tool","install","--tool-path",$toolsPath,"--ignore-failed-sources","dotnet-format","--version","3.1.37601")
-
-        Invoke-DotnetExe $RepoRoot $args
-    }
 }
 
 Function Install-CommonBuildTools {
@@ -146,32 +134,4 @@ Function Install-CommonBuildTools {
 
     Install-DotnetCLI $RepoRoot
     Install-NuGetExe $RepoRoot
-    Install-DotnetTools $RepoRoot
-}
-
-Function Invoke-DotnetFormat {
-    param(
-        [string]$RepoRoot
-    )
-
-    $formatExe = Join-Path $RepoRoot ".nuget/tools/dotnet-format.exe"
-
-    $args = @("-w",$RepoRoot)
-
-    # On CI builds fail instead of making code changes
-    if ($env:CI -eq "True") 
-    {
-        $args += "--check"
-    }
-
-    $command = "$formatExe $args"
-    Write-Host "[EXEC] $command" -ForegroundColor Cyan
-
-    & $formatExe $args
-
-    if (-not $?) {
-        Write-Error "Run dotnet-format to fix style errors and try again!"
-        Write-Error $command
-        exit 1
-    }
 }
