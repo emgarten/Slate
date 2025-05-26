@@ -69,31 +69,35 @@ namespace Slate.Utils
         /// </summary>
         public static Exception Unwrap(Exception ex)
         {
-            return FlattenExceptions(ex).FirstOrDefault();
+            return FlattenExceptions(ex).LastOrDefault();
         }
 
         /// <summary>
-        /// Flatten AggregateExceptions
+        /// Flatten exception hierarchies including AggregateException and <see cref="Exception.InnerException"/> chains.
         /// </summary>
         public static IEnumerable<Exception> FlattenExceptions(Exception ex)
         {
-            if (ex != null)
+            if (ex == null)
             {
-                if (ex is AggregateException ag)
-                {
-                    return ag.InnerExceptions.SelectMany(e => FlattenExceptions(e));
-                }
-                else if (ex is TargetInvocationException te)
-                {
-                    return FlattenExceptions(te.InnerException);
-                }
-                else
-                {
-                    return new[] { ex };
-                }
+                return Enumerable.Empty<Exception>();
             }
 
-            return Enumerable.Empty<Exception>();
+            if (ex is AggregateException ag)
+            {
+                return ag.InnerExceptions.SelectMany(e => FlattenExceptions(e));
+            }
+
+            if (ex is TargetInvocationException te)
+            {
+                return FlattenExceptions(te.InnerException);
+            }
+
+            if (ex.InnerException != null)
+            {
+                return new[] { ex }.Concat(FlattenExceptions(ex.InnerException));
+            }
+
+            return new[] { ex };
         }
 
         /// <summary>
